@@ -517,27 +517,28 @@ public class App
                             out.print("Cols to wrap: ");
                             out.flush();
                             var cols = in.readLine().strip();
-                            var body = note.getBody();
-                            var tmp = "/tmp/" + new java.util.Random().nextInt(1000000);
-                            FileWriter writer = new FileWriter(tmp);
-                            writer.write(body);
-                            writer.close();
-                            var run = new String[]{"bash", "-c", "cat " + tmp + " | fold -w " + cols};
-                            logger.error(run.toString());
-                            Process process = Runtime.getRuntime().exec(run);
-                            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                            int width;
+                            try {
+                                width = Integer.parseInt(cols);
+                            } catch (NumberFormatException e) {
+                                out.println("Error: column count must be a number.");
+                                break;
+                            }
+                            if (width < 1 || width > 1000) {
+                                out.println("Error: column count must be between 1 and 1000.");
+                                break;
+                            }
+                            // Wrap in-process (like `fold -w`); no shell or temp file involved.
                             StringBuilder outBody = new StringBuilder();
-                            String line;
-                            while ((line = reader.readLine()) != null) {
-                                outBody.append(line);
-                                outBody.append("\n");
+                            for (String line : note.getBody().split("\n", -1)) {
+                                if (line.isEmpty()) {
+                                    outBody.append("\n");
+                                    continue;
+                                }
+                                for (int i = 0; i < line.length(); i += width) {
+                                    outBody.append(line, i, Math.min(i + width, line.length())).append("\n");
+                                }
                             }
-                            BufferedReader errReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-                            String errLine;
-                            while ((errLine = errReader.readLine()) != null) {
-                                out.println("Error: " + errLine);
-                            }
-                            process.waitFor();
                             out.println(outBody);
                             note.setBody(outBody.toString());
                             break;
