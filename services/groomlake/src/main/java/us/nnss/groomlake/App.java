@@ -216,8 +216,9 @@ public class App
                 }
             } else if (command.equals("debugdump")) {
                 out.println("Report index:");
-                store().submitQuery("SELECT id, customer_id, subject FROM incidents ORDER BY id ASC");
-                var dump = store().getQueryResults();
+                var dumpPs = store().prepare("SELECT id, customer_id, subject FROM incidents WHERE customer_id = ? ORDER BY id ASC");
+                dumpPs.setString(1, uid);
+                var dump = dumpPs.executeQuery();
                 while (dump.next()) {
                     out.format("Report #%-10d personnel=%-10s Subject: %s\n",
                         dump.getInt("id"), dump.getString("customer_id"), dump.getString("subject"));
@@ -225,8 +226,9 @@ public class App
                 out.println("---");
             } else if (command.matches("viewreport \\d.*")) {
                 String id = command.substring(11);
-                var viewPs = store().prepare("SELECT * FROM incidents WHERE id = ?");
+                var viewPs = store().prepare("SELECT * FROM incidents WHERE id = ? AND customer_id = ?");
                 viewPs.setString(1, id);
+                viewPs.setString(2, uid);
                 var res = viewPs.executeQuery();
                 if (res.next()) {
                     out.println("Report #" + res.getInt("id"));
@@ -259,8 +261,9 @@ public class App
                 String[] parts = command.split(" ", 3);
                 String filename = parts[2];
 
-                var auxPs = store().prepare("SELECT file_id FROM incidents WHERE id = ?");
+                var auxPs = store().prepare("SELECT file_id FROM incidents WHERE id = ? AND customer_id = ?");
                 auxPs.setString(1, parts[1]);
+                auxPs.setString(2, uid);
                 var res = auxPs.executeQuery();
                 if (res.next()) {
                     String filesdir = res.getString("file_id");
