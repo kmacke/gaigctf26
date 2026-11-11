@@ -1,3 +1,1 @@
-target/
-data/
-incidents/
+.claude/settings.local.json
