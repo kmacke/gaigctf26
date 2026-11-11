@@ -24,6 +24,23 @@ public class App
         return STORE.get();
     }
 
+    // Resolve a user-supplied attachment name inside a report directory. Returns
+    // null for anything that is not a plain file name, or that would land outside
+    // the directory once symlinks and ".." are resolved.
+    private static File resolveInside(File dir, String name) throws IOException {
+        if (name == null || name.isEmpty() || name.equals("main")
+                || name.contains("/") || name.contains("\\") || name.contains("\0")
+                || name.equals(".") || name.equals("..")) {
+            return null;
+        }
+        File candidate = new File(dir, name);
+        String base = dir.getCanonicalPath() + File.separator;
+        if (!candidate.getCanonicalPath().startsWith(base)) {
+            return null;
+        }
+        return candidate;
+    }
+
     // Defence in depth for logging: strip control characters (log forging) and
     // defuse "${" so user input can never look like a lookup expression.
     private static String clean(String s) {
@@ -186,10 +203,15 @@ public class App
                     out.flush();
                     String content = in.readLine().strip();
                     
-                    FileWriter auxWriter = new FileWriter(new File(dir, filename));
-                    auxWriter.write(content);
-                    auxWriter.close();
-                    
+                    File auxFile = resolveInside(dir, filename);
+                    if (auxFile == null) {
+                        out.println("Invalid file name.");
+                    } else {
+                        FileWriter auxWriter = new FileWriter(auxFile);
+                        auxWriter.write(content);
+                        auxWriter.close();
+                    }
+
                     out.print("Would you like to attach another file? (y/n) ");
                     out.flush();
                 }
@@ -259,6 +281,10 @@ public class App
                 }
             } else if (command.startsWith("auxfile ")) {
                 String[] parts = command.split(" ", 3);
+                if (parts.length < 3) {
+                    out.println("Usage: auxfile <report> <filename>");
+                    continue;
+                }
                 String filename = parts[2];
 
                 var auxPs = store().prepare("SELECT file_id FROM incidents WHERE id = ? AND customer_id = ?");
@@ -267,8 +293,8 @@ public class App
                 var res = auxPs.executeQuery();
                 if (res.next()) {
                     String filesdir = res.getString("file_id");
-                    File file = new File("./incidents/" + filesdir, filename);
-                    if (file.exists()) {
+                    File file = resolveInside(new File("./incidents/" + filesdir), filename);
+                    if (file != null && file.isFile()) {
                         BufferedReader fileReader = new BufferedReader(new FileReader(file));
                         fileReader.lines().forEach(out::println);
                         fileReader.close();
