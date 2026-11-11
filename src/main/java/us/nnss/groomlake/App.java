@@ -24,6 +24,12 @@ public class App
         return STORE.get();
     }
 
+    // Defence in depth for logging: strip control characters (log forging) and
+    // defuse "${" so user input can never look like a lookup expression.
+    private static String clean(String s) {
+        return s.replaceAll("\\p{Cntrl}", "_").replace("${", "$_{");
+    }
+
     // Only Note (and what it contains) may ever be deserialized; anything else,
     // including gadget classes, is rejected before it is instantiated.
     private static final ObjectInputFilter NOTE_FILTER = ObjectInputFilter.Config.createFilter(
@@ -113,7 +119,7 @@ public class App
         out.print("Personnel username: ");
         out.flush();
         String username = in.readLine().strip();
-        logger.info("Personnel login to {}", username);
+        logger.info("Personnel login to {}", clean(username));
         out.print("Password: ");
         out.flush();
         String password = in.readLine().strip();
@@ -311,7 +317,7 @@ public class App
         ps.executeUpdate();
         store().commit();
 
-        logger.info("New personnel record {} created", username);
+        logger.info("New personnel record {} created", clean(username));
         out.println("Personnel account created! Please log in with your new account.");
     }
 
@@ -597,7 +603,7 @@ public class App
         ps.executeUpdate();
         store().commit();
 
-        logger.info("New clearance officer {} created", username);
+        logger.info("New clearance officer {} created", clean(username));
         out.println("Clearance officer account created! Please log in with your new account.");
     }
 
