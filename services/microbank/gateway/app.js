@@ -316,12 +316,12 @@ app.get('/api/transaction/:txn_id', requireAuth, async (req, res) => {
 });
 
 app.get('/api/memo/:txn_id', requireAuth, async (req, res) => {
-  try {
-    const resp = await axios.get(`${ENGINE_URL}/internal/transaction/${req.params.txn_id}`);
-    res.json({ memo: resp.data.memo, transaction_id: req.params.txn_id });
-  } catch (err) {
-    res.status(404).json({ error: 'transaction not found' });
-  }
+ const resp = await axios.get(`${ENGINE_URL}/internal/transaction/${req.params.txn_id}`);
+    const t = resp.data;
+    if (t.account_id !== req.user.account_id && t.to_account !== req.user.account_id) {
+      return res.status(404).json({ error: 'transaction not found' });
+    }
+    res.json({ memo: t.memo, transaction_id: req.params.txn_id });
 });
 
 app.get('/api/statement', requireAuth, async (req, res) => {
@@ -335,10 +335,10 @@ app.get('/api/statement', requireAuth, async (req, res) => {
     nickname = nickname.normalize('NFKC');
 
     const templatePath = path.join(__dirname, 'views', 'statement.ejs');
-    let templateSrc = fs.readFileSync(templatePath, 'utf8');
-    templateSrc = templateSrc.replace('NICKNAME_PLACEHOLDER', nickname);
+    const templateSrc = fs.readFileSync(templatePath, 'utf8');
 
     const html = ejs.render(templateSrc, {
+      nickname: nickname,
       account_id: req.user.account_id,
       balance: balResp.data.balance,
       transactions: txnResp.data.transactions || []
@@ -358,7 +358,8 @@ app.get('/api/admin/audit', requireAuth, async (req, res) => {
     }
 
     const resp = await axios.get(`${ENGINE_URL}/internal/audit`);
-    res.json(resp.data);
+    const entries = (resp.data.audit_entries || []).filter(e => e.account_id === req.user.account_id);
+    res.json({ audit_entries: entries, count: entries.length });
   } catch (err) {
     console.error('audit error:', err.message);
     res.status(500).json({ error: 'audit failed' });

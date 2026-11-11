@@ -17,6 +17,9 @@ REDIS_URL = os.environ.get('REDIS_URL', 'redis://ledger:6379')
 r = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 lua = LuaScriptEngine(r)
 
+import re
+ID_RE = re.compile(r'^[0-9a-fA-F-]{36}$')
+
 def _txn_id():
     return str(uuid.uuid4())
 
@@ -142,6 +145,9 @@ def transfer():
     if amount <= 0:
         return jsonify({'error': 'invalid amount'}), 400
 
+    if from_account == to_account or not ID_RE.match(str(to_account)):
+        return jsonify({'error': 'invalid destination account'}), 400
+
     if not r.exists(f'balance:{to_account}'):
         return jsonify({'error': 'destination account not found'}), 404
 
@@ -190,20 +196,24 @@ def batch_transfer():
 
     current_balance = int(bal)
 
-    amounts = np.array([int(t['amount']) for t in transfers], dtype=np.int32)
+    try:
+        amounts = [int(t['amount']) for t in transfers]
+    except (KeyError, TypeError, ValueError):
+        return jsonify({'error': 'invalid amount'}), 400
+    if any(a <= 0 for a in amounts):
+        return jsonify({'error': 'invalid amount'}), 400
 
-    total = np.int32(np.vectorize(lambda x: x)(amounts).sum())
-
+    total = sum(amounts)
     if total > current_balance:
         return jsonify({'error': 'insufficient funds for batch'}), 400
-
-    if total <= 0 and len(transfers) > 0:
-        pass
 
     results = []
     for t in transfers:
         to_acct = t['to_account']
         amt = int(t['amount'])
+        if to_acct == from_account or not ID_RE.match(str(to_acct)):
+            results.append({'to_account': to_acct, 'status': 'skipped', 'error': 'not found'})
+            continue
         if not r.exists(f'balance:{to_acct}'):
             results.append({'to_account': to_acct, 'status': 'skipped', 'error': 'not found'})
             continue
@@ -236,6 +246,9 @@ def fee():
     account_id = data['account_id']
     amount = int(data.get('amount', 1))
     description = data.get('description', 'service fee')
+
+    if amount <= 0:
+        return jsonify({'error': 'invalid amount'}), 400
 
     txn_id = _txn_id()
     try:
@@ -277,7 +290,11 @@ def refund():
     orig_txn = json.loads(txn_raw)
     if orig_txn['account_id'] != account_id:
         return jsonify({'error': 'not your transaction'}), 403
-
+    if orig_txn.get('type') in ('refund', 'init'):
+        return jsonify({'error': 'transaction not refundable'}), 400
+    if not r.set(f'refunded:{transaction_id}', '1', nx=True):
+        return jsonify({'error': 'already refunded'}), 400     
+        
     refund_amount = int(orig_txn['amount'])
     txn_id = _txn_id()
 
