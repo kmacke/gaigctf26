@@ -1,0 +1,13 @@
+services:
+  groomlake:
+    build: .
+    ports:
+      - "1000:12345"
+    volumes:
+      - groomlake_data:/app/data
+      - groomlake_incidents:/app/incidents
+    restart: unless-stopped
+
+volumes:
+  groomlake_data:
+  groomlake_incidents:
