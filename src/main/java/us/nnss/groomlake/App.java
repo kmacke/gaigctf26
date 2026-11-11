@@ -104,8 +104,10 @@ public class App
         hash.runHash();
         var pw_hash = hash.getHash();
 
-        store().submitQuery("SELECT * FROM personnel WHERE username = '" + username + "' AND password = '" + pw_hash + "'");
-        var res = store().getQueryResults();
+        var loginPs = store().prepare("SELECT * FROM personnel WHERE username = ? AND password = ?");
+        loginPs.setString(1, username);
+        loginPs.setInt(2, pw_hash);
+        var res = loginPs.executeQuery();
         if (!res.next()) {
             out.println("Login failed.");
             return;
@@ -182,8 +184,9 @@ public class App
                 store().commit();
             } else if (command.equals("listreports")) {
                 out.println("Pulling records from the archive...");
-                store().submitQuery("SELECT * FROM incidents WHERE customer_id = " + uid);
-                var res = store().getQueryResults();
+                var listPs = store().prepare("SELECT * FROM incidents WHERE customer_id = ?");
+                listPs.setString(1, uid);
+                var res = listPs.executeQuery();
                 while (res.next()) {
                     out.format("Report #%-10d Subject: %s\n", res.getInt("id"), res.getString("subject"));
                 }
@@ -198,8 +201,9 @@ public class App
                 out.println("---");
             } else if (command.matches("viewreport \\d.*")) {
                 String id = command.substring(11);
-                store().submitQuery("SELECT * FROM incidents WHERE id = " + id);
-                var res = store().getQueryResults();
+                var viewPs = store().prepare("SELECT * FROM incidents WHERE id = ?");
+                viewPs.setString(1, id);
+                var res = viewPs.executeQuery();
                 if (res.next()) {
                     out.println("Report #" + res.getInt("id"));
                     out.println("Subject: " + res.getString("subject"));
@@ -231,8 +235,9 @@ public class App
                 String[] parts = command.split(" ", 3);
                 String filename = parts[2];
 
-                store().submitQuery("SELECT file_id FROM incidents WHERE id = " + parts[1]);
-                var res = store().getQueryResults();
+                var auxPs = store().prepare("SELECT file_id FROM incidents WHERE id = ?");
+                auxPs.setString(1, parts[1]);
+                var res = auxPs.executeQuery();
                 if (res.next()) {
                     String filesdir = res.getString("file_id");
                     File file = new File("./incidents/" + filesdir, filename);
@@ -333,8 +338,9 @@ public class App
             return;
         }
 
-        store().submitQuery("SELECT * FROM officers WHERE username = '" + selectedUsername + "'");
-        var res = store().getQueryResults();
+        var offPs = store().prepare("SELECT * FROM officers WHERE username = ?");
+        offPs.setString(1, selectedUsername);
+        var res = offPs.executeQuery();
         if (!res.next()) {
             out.println("Login failed.");
             return;
@@ -401,8 +407,9 @@ public class App
 
                 out.println("Field log filed.");
             } else if (command.equals("viewnotes")) {
-                store().submitQuery("SELECT id, content FROM field_logs WHERE employee_id = " + uid);
-                var res = store().getQueryResults();
+                var logsPs = store().prepare("SELECT id, content FROM field_logs WHERE employee_id = ?");
+                logsPs.setString(1, uid);
+                var res = logsPs.executeQuery();
                 var notes = new java.util.HashMap<Integer, byte[]>();
                 while (res.next()) {
                     notes.put(res.getInt("id"), res.getBytes("content"));
@@ -441,8 +448,10 @@ public class App
                 out.print("Enter field log ID to process: ");
                 out.flush();
                 String noteId = in.readLine().strip();
-                store().submitQuery("SELECT content FROM field_logs WHERE id = " + noteId + " AND employee_id = " + uid);
-                var res = store().getQueryResults();
+                var procPs = store().prepare("SELECT content FROM field_logs WHERE id = ? AND employee_id = ?");
+                procPs.setString(1, noteId);
+                procPs.setString(2, uid);
+                var res = procPs.executeQuery();
                 if (res.next()) {
                     var note_bytes = res.getBytes("content");
                     ByteArrayInputStream bis = new ByteArrayInputStream(note_bytes);
