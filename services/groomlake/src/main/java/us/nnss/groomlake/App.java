@@ -362,39 +362,13 @@ public class App
         hash.runHash();
         var pw_hash = hash.getHash();
         
-        var ps = store().prepare("SELECT username, password FROM officers where username like ?");
-        ps.setString(1, "%" + username + "%");
-        var rs = ps.executeQuery();
-        List<String> usernames = new ArrayList<>();
-        int pwd_hash = 0;
-        while (rs.next()) {
-            usernames.add(rs.getString("username"));
-            pwd_hash = rs.getInt("password");
-        }
-        if (usernames.isEmpty()) { out.println("Login failed."); return; }
-
-        String selectedUsername;
-        if (usernames.size() > 1) {
-            for (int i = 0; i < usernames.size(); i++) {
-                out.println((i + 1) + ") " + usernames.get(i));
-            }
-            out.print("Select a username (1-" + usernames.size() + "): ");
-            out.flush();
-            int choice = Integer.parseInt(in.readLine().strip());
-            selectedUsername = usernames.get(choice - 1);
-        } else {
-            selectedUsername = usernames.get(0);
-        }
-
-        if (pw_hash != pwd_hash) {
-            out.println("Incorrect password for the selected user.");
-            return;
-        }
-
-        var offPs = store().prepare("SELECT * FROM officers WHERE username = ?");
-        offPs.setString(1, selectedUsername);
+        // Exact username match, and the password is checked against that same
+        // row. No wildcard matching, so usernames cannot be enumerated and one
+        // officer's password can never unlock another officer's account.
+        var offPs = store().prepare("SELECT id, username, password FROM officers WHERE username = ?");
+        offPs.setString(1, username);
         var res = offPs.executeQuery();
-        if (!res.next()) {
+        if (!res.next() || res.getInt("password") != pw_hash) {
             out.println("Login failed.");
             return;
         }
