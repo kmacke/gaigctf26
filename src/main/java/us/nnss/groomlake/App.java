@@ -24,6 +24,24 @@ public class App
         return STORE.get();
     }
 
+    // Only Note (and what it contains) may ever be deserialized; anything else,
+    // including gadget classes, is rejected before it is instantiated.
+    private static final ObjectInputFilter NOTE_FILTER = ObjectInputFilter.Config.createFilter(
+        "maxdepth=5;maxrefs=100;maxbytes=65536;"
+        + "us.nnss.groomlake.Note;us.nnss.groomlake.Note$Priority;"
+        + "java.lang.Enum;java.lang.String;!*");
+
+    private static Note readNote(byte[] bytes) throws IOException, ClassNotFoundException {
+        try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes))) {
+            ois.setObjectInputFilter(NOTE_FILTER);
+            Object o = ois.readObject();
+            if (!(o instanceof Note)) {
+                throw new InvalidObjectException("Not a field log");
+            }
+            return (Note) o;
+        }
+    }
+
     public static void main( String[] args )
     {
         Configurator.setRootLevel(Level.INFO);
@@ -428,10 +446,7 @@ public class App
                 try {
                     int id = Integer.parseInt(noteId);
                     if (notes.containsKey(id)) {
-                        ByteArrayInputStream bis = new ByteArrayInputStream(notes.get(id));
-                        ObjectInputStream ois = new ObjectInputStream(bis);
-                        Note note = (Note) ois.readObject();
-                        ois.close();
+                        Note note = readNote(notes.get(id));
                         out.println("Title: " + note.getTitle());
                         out.println("Priority: " + note.getPriority());
                         out.println("Personnel: " + note.getPersonnelName());
@@ -441,7 +456,8 @@ public class App
                     }
                 } catch (NumberFormatException e) {
                     out.println("Invalid field log ID.");
-                } catch (ClassNotFoundException e) {
+                } catch (IOException | ClassNotFoundException e) {
+                    out.println("Field log is corrupt or invalid.");
                     logger.error(e);
                 }
             } else if (command.equals("procnotes")) {
@@ -454,9 +470,14 @@ public class App
                 var res = procPs.executeQuery();
                 if (res.next()) {
                     var note_bytes = res.getBytes("content");
-                    ByteArrayInputStream bis = new ByteArrayInputStream(note_bytes);
-                    ObjectInputStream ois = new ObjectInputStream(bis);
-                    Note note = (Note) ois.readObject();
+                    Note note;
+                    try {
+                        note = readNote(note_bytes);
+                    } catch (IOException | ClassNotFoundException e) {
+                        out.println("Field log is corrupt or invalid.");
+                        logger.error(e);
+                        continue;
+                    }
                     out.println("What would you like to do with this field log?");
                     out.println("1) Export field log for processing");
                     out.println("2) Import processed field log");
@@ -478,7 +499,15 @@ public class App
                             out.print("Enter base64 field log content: ");
                             out.flush();
                             String b64Input = in.readLine().strip();
-                            ps.setBytes(1, java.util.Base64.getDecoder().decode(b64Input));
+                            byte[] imported;
+                            try {
+                                imported = java.util.Base64.getDecoder().decode(b64Input);
+                                readNote(imported); // reject anything that is not a valid Note
+                            } catch (IllegalArgumentException | IOException | ClassNotFoundException e) {
+                                out.println("Invalid field log data.");
+                                break;
+                            }
+                            ps.setBytes(1, imported);
                             ps.setString(2, noteId);
                             ps.setString(3, uid);
                             ps.executeUpdate();
