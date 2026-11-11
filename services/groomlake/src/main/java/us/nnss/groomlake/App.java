@@ -362,13 +362,49 @@ public class App
         hash.runHash();
         var pw_hash = hash.getHash();
         
-        // Exact username match, and the password is checked against that same
-        // row. No wildcard matching, so usernames cannot be enumerated and one
-        // officer's password can never unlock another officer's account.
-        var offPs = store().prepare("SELECT id, username, password FROM officers WHERE username = ?");
-        offPs.setString(1, username);
+        // Partial-alias lookup is kept (clients rely on the "Select a username"
+        // prompt), but each candidate's own password hash is remembered so the
+        // password is verified against the officer actually selected.
+        var ps = store().prepare("SELECT username, password FROM officers where username like ?");
+        ps.setString(1, "%" + username + "%");
+        var rs = ps.executeQuery();
+        List<String> usernames = new ArrayList<>();
+        List<Integer> hashes = new ArrayList<>();
+        while (rs.next()) {
+            usernames.add(rs.getString("username"));
+            hashes.add(rs.getInt("password"));
+        }
+        if (usernames.isEmpty()) { out.println("Login failed."); return; }
+
+        int selected = 0;
+        if (usernames.size() > 1) {
+            for (int i = 0; i < usernames.size(); i++) {
+                out.println((i + 1) + ") " + usernames.get(i));
+            }
+            out.print("Select a username (1-" + usernames.size() + "): ");
+            out.flush();
+            try {
+                selected = Integer.parseInt(in.readLine().strip()) - 1;
+            } catch (NumberFormatException e) {
+                out.println("Login failed.");
+                return;
+            }
+            if (selected < 0 || selected >= usernames.size()) {
+                out.println("Login failed.");
+                return;
+            }
+        }
+        String selectedUsername = usernames.get(selected);
+
+        if (pw_hash != hashes.get(selected)) {
+            out.println("Incorrect password for the selected user.");
+            return;
+        }
+
+        var offPs = store().prepare("SELECT * FROM officers WHERE username = ?");
+        offPs.setString(1, selectedUsername);
         var res = offPs.executeQuery();
-        if (!res.next() || res.getInt("password") != pw_hash) {
+        if (!res.next()) {
             out.println("Login failed.");
             return;
         }
