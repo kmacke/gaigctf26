@@ -63,6 +63,15 @@ public sealed class AssetsIncomeModel(
         Id = id;
         Normalize(Input.Assets, Input.Incomes);
 
+        foreach (var amount in Input.Assets.Select(x => x.Amount).Concat(Input.Incomes.Select(x => x.Amount)))
+        {
+            if (!string.IsNullOrWhiteSpace(amount) && !MortgageAmount.IsValid(amount))
+            {
+                ModelState.AddModelError(string.Empty, "Amounts must be plain numbers, for example 12500.50.");
+                break;
+            }
+        }
+
         if (!HasAnyAssetOrIncome())
         {
             ModelState.AddModelError(string.Empty, "Add at least one asset or income source to continue.");

@@ -3,6 +3,7 @@ using Lamort.Shared.Auth;
 using Lamort.Shared.Messaging;
 using Lamort.Web.Data;
 using Lamort.Web.Services;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -23,12 +24,16 @@ builder.Services
     .AddIdentity<LamortUser, IdentityRole>(options =>
     {
         options.SignIn.RequireConfirmedAccount = false;
-        options.Password.RequireDigit = false;
-        options.Password.RequireLowercase = false;
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
         options.Password.RequireUppercase = false;
         options.Password.RequireNonAlphanumeric = false;
-        options.Password.RequiredLength = 0;
-        options.Password.RequiredUniqueChars = 0;
+        options.Password.RequiredLength = 12;
+        options.Password.RequiredUniqueChars = 4;
+        options.User.RequireUniqueEmail = true;
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+        options.Lockout.AllowedForNewUsers = true;
     })
     .AddEntityFrameworkStores<WebDbContext>()
     .AddDefaultTokenProviders();
@@ -40,6 +45,25 @@ builder.Services.AddAuthentication(options =>
     options.DefaultSignInScheme = IdentityConstants.ApplicationScheme;
 });
 
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // TLS terminates at the proxy; see ForwardedHeaders
+    options.ExpireTimeSpan = TimeSpan.FromHours(8);
+    options.SlidingExpiration = true;
+    options.LoginPath = "/Account/Login";
+    options.AccessDeniedPath = "/Account/Login";
+});
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // Only the nginx container on the internal docker network is expected to set these.
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 builder.Services.AddAuthorization();
 builder.Services.AddRazorPages(options =>
 {
@@ -49,7 +73,20 @@ builder.Services.AddRazorPages(options =>
 
 builder.Services.AddScoped<JwtTokenService>();
 
+builder.Configuration.GetSection("Jwt").Get<JwtSettings>()?.EnsureValid();
+
 var app = builder.Build();
+
+app.UseForwardedHeaders();
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["X-Frame-Options"] = "DENY";
+    headers["Referrer-Policy"] = "no-referrer";
+    headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    await next();
+});
 
 app.UseExceptionHandler("/Error");
 app.UseStaticFiles();
@@ -67,6 +104,7 @@ app.MapGet("/auth/token", async (
         return Results.Unauthorized();
     }
 
+    httpContext.Response.Headers.CacheControl = "no-store";
     var user = await userManager.GetUserAsync(httpContext.User);
     return user is null ? Results.Unauthorized() : Results.Ok(tokenService.CreateToken(user));
 }).RequireAuthorization();

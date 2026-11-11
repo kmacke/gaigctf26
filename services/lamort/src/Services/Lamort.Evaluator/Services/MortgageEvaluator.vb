@@ -14,10 +14,6 @@ Namespace Services
             Dim workingDirectory = Path.Combine(Path.GetTempPath(), "lamort-evaluator", Guid.NewGuid().ToString("N"))
             Directory.CreateDirectory(workingDirectory)
 
-            Console.WriteLine(application.Incomes)
-            Console.WriteLine(application.Assets)
-            Console.WriteLine(application.Debts)
-
             Try
                 Dim scriptPath = Path.Combine(workingDirectory, "evaluate.pl")
 
@@ -29,22 +25,29 @@ Namespace Services
                 builder.AppendLine("use JSON::PP qw(encode_json);")
                 builder.AppendLine()
                 builder.AppendLine("my $score = 0;")
+                ' SECURITY: amounts are user-supplied free text. Parse to a number and emit
+                ' only the invariant-culture numeric literal, never the raw string, so it
+                ' cannot inject Perl code.
                 For Each income In application.Incomes
                     If income <> "" Then
-                        builder.AppendLine($"$score += 5 * {income};")
+                        builder.AppendLine($"$score += 5 * {ToNumericLiteral(income)};")
                     End If
                 Next
                 For Each asset In application.Assets
                     If asset <> "" Then
-                        builder.AppendLine($"$score += {asset};")
+                        builder.AppendLine($"$score += {ToNumericLiteral(asset)};")
                     End If
                 Next
                 For Each debt In application.Debts
                     If debt <> "" Then
-                        builder.AppendLine($"$score -= 2 * {debt};")
+                        builder.AppendLine($"$score -= 2 * {ToNumericLiteral(debt)};")
                     End If
                 Next
-                builder.AppendLine($"my $home_price = {application.HomePriceMax};")
+                If application.HomePriceMax.HasValue Then
+                    builder.AppendLine($"my $home_price = {application.HomePriceMax.Value.ToString(CultureInfo.InvariantCulture)};")
+                Else
+                    builder.AppendLine("my $home_price = undef;")
+                End If
                 builder.AppendLine("my $required_score = 2;")
                 builder.AppendLine("if (defined $home_price) {")
                 builder.AppendLine("    if ($home_price <= 50000) {")
@@ -63,7 +66,6 @@ Namespace Services
                 builder.AppendLine()
                 builder.AppendLine("print encode_json({ approved => $approved ? JSON::PP::true() : JSON::PP::false(), reason => $reason });")
                 Dim script = builder.ToString()
-                Console.WriteLine(script)
 
                 File.WriteAllText(scriptPath, script)
 
@@ -95,9 +97,22 @@ Namespace Services
 
                     Return New EvaluationResult(result.Approved, result.Reason)
                 End Using
-            Catch ex As Exception
-                Console.WriteLine(ex.Message)
+            Finally
+                Try
+                    Directory.Delete(workingDirectory, True)
+                Catch ex As IOException
+                    ' best-effort cleanup
+                End Try
             End Try
+        End Function
+
+        Private Shared Function ToNumericLiteral(raw As String) As String
+            Dim value As Decimal
+            Dim cleaned = raw.Trim().Replace("$", "").Replace(",", "")
+            If Not Decimal.TryParse(cleaned, NumberStyles.Number Or NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, value) Then
+                Throw New InvalidOperationException("Amount is not a valid number.")
+            End If
+            Return value.ToString(CultureInfo.InvariantCulture)
         End Function
     End Class
 

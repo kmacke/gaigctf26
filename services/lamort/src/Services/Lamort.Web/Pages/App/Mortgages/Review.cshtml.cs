@@ -128,7 +128,7 @@ public sealed class ReviewModel(
             {
                 Status = MortgagePresentation.FormatStatus(application.Status),
                 CoApplicants = application.HasCoApplicants ? "Yes" : "No",
-                SocialSecurityNumber = string.IsNullOrWhiteSpace(application.SocialSecurityNumber) ? "Not provided" : application.SocialSecurityNumber,
+                SocialSecurityNumber = string.IsNullOrWhiteSpace(application.SocialSecurityNumber) ? "Not provided" : "***-**-" + application.SocialSecurityNumber[^Math.Min(4, application.SocialSecurityNumber.Length)..],
                 AssetEntries = MortgagePresentation.FormatEntryCount(application.Assets.Count),
                 IncomeEntries = MortgagePresentation.FormatEntryCount(application.Incomes.Count),
                 TotalDebts = MortgagePresentation.FormatCurrency(application.Debts.Sum(x => x.Amount)),

@@ -9,9 +9,10 @@ namespace Lamort.Web.Services;
 
 public sealed class JwtTokenService(JwtSettings settings)
 {
-    public TokenResponse CreateToken(LamortUser user)
+    public TokenResponse CreateToken(LamortUser user, string? audience = null, int? lifetimeMinutes = null)
     {
-        var expiresUtc = DateTime.UtcNow.AddMinutes(settings.ExpirationMinutes);
+        settings.EnsureValid();
+        var expiresUtc = DateTime.UtcNow.AddMinutes(lifetimeMinutes ?? settings.ExpirationMinutes);
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.SigningKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
@@ -25,7 +26,7 @@ public sealed class JwtTokenService(JwtSettings settings)
 
         var token = new JwtSecurityToken(
             issuer: settings.Issuer,
-            audience: settings.Audience,
+            audience: audience ?? settings.Audience,
             claims: claims,
             expires: expiresUtc,
             signingCredentials: credentials);

@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Lamort.Shared.Auth;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -21,6 +22,11 @@ public sealed class RegisterModel(
 
     public async Task<IActionResult> OnPostAsync()
     {
+        if (!ModelState.IsValid)
+        {
+            return Page();
+        }
+
         var user = new LamortUser
         {
             UserName = Input.Email,
@@ -51,10 +57,13 @@ public sealed class RegisterModel(
 
     public sealed class InputModel
     {
+        [StringLength(200)]
         public string FullName { get; set; } = string.Empty;
 
+        [Required, EmailAddress, StringLength(256)]
         public string Email { get; set; } = string.Empty;
 
+        [Required, StringLength(128, MinimumLength = 12)]
         public string Password { get; set; } = string.Empty;
     }
 }

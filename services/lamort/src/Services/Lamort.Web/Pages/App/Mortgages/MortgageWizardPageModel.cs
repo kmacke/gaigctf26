@@ -20,11 +20,18 @@ public abstract class MortgageWizardPageModel(
 
     protected async Task<MortgageApplication?> LoadApplicationAsync(Guid id)
     {
+        // SECURITY: scope every lookup to the signed-in owner (prevents IDOR on read/edit/submit).
+        var userId = UserManager.GetUserId(User);
+        if (string.IsNullOrEmpty(userId))
+        {
+            return null;
+        }
+
         return await DbContext.MortgageApplications
             .Include(x => x.Assets)
             .Include(x => x.Incomes)
             .Include(x => x.Debts)
-            .SingleOrDefaultAsync(x => x.Id == id);
+            .SingleOrDefaultAsync(x => x.Id == id && x.UserId == userId);
     }
 
     protected IActionResult RedirectToWizardPage(string pageName, Guid id)

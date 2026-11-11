@@ -136,36 +136,89 @@ public sealed class MortgagePdfRenderer(
 
     private async Task<byte[]> RenderPdfBytesAsync(MortgageSnapshot snapshot, CancellationToken cancellationToken)
     {
-        var workingDirectory = Path.Combine(Path.GetTempPath(), "lamort-docrender", snapshot.MortgageApplicationId.ToString("N"));
+        // Unique, per-render directory; removed afterwards so SSNs don't linger on disk.
+        var workingDirectory = Path.Combine(Path.GetTempPath(), "lamort-docrender", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workingDirectory);
 
-        var postScriptPath = Path.Combine(workingDirectory, "mortgage.ps");
-        var pdfPath = Path.Combine(workingDirectory, "mortgage.pdf");
-
-        await File.WriteAllTextAsync(postScriptPath, BuildPostScript(snapshot), Encoding.ASCII, cancellationToken);
-
-        var documentTitle = ResolveApplicationName(snapshot);
-        var command = string.Create(
-            CultureInfo.InvariantCulture,
-            $"gs -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -sTitle={documentTitle} -sOutputFile={pdfPath} {postScriptPath}");
-        var startInfo = new ProcessStartInfo
+        try
         {
-            FileName = "/bin/sh",
-            RedirectStandardError = true,
-            RedirectStandardOutput = true
-        };
-        startInfo.ArgumentList.Add("-c");
-        startInfo.ArgumentList.Add(command);
+            var postScriptPath = Path.Combine(workingDirectory, "mortgage.ps");
+            var pdfPath = Path.Combine(workingDirectory, "mortgage.pdf");
 
-        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Unable to start Ghostscript.");
-        await process.WaitForExitAsync(cancellationToken);
-        if (process.ExitCode != 0)
+            await File.WriteAllTextAsync(postScriptPath, BuildPostScript(snapshot), Encoding.ASCII, cancellationToken);
+
+            // SECURITY: no shell. Arguments are passed as discrete argv entries, so user-controlled
+            // text (application name) can never be interpreted as shell syntax.
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "gs",
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false
+            };
+            startInfo.ArgumentList.Add("-dSAFER");
+            startInfo.ArgumentList.Add("-dBATCH");
+            startInfo.ArgumentList.Add("-dNOPAUSE");
+            startInfo.ArgumentList.Add("-sDEVICE=pdfwrite");
+            startInfo.ArgumentList.Add("-sOutputFile=" + pdfPath);
+            startInfo.ArgumentList.Add(postScriptPath);
+
+            using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Unable to start Ghostscript.");
+            var stdout = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            var stderr = process.StandardError.ReadToEndAsync(cancellationToken);
+
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(30));
+            try
+            {
+                await process.WaitForExitAsync(timeout.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+                throw;
+            }
+
+            await stdout;
+            var error = await stderr;
+            if (process.ExitCode != 0)
+            {
+                throw new InvalidOperationException($"Ghostscript failed with exit code {process.ExitCode}: {error}");
+            }
+
+            return await File.ReadAllBytesAsync(pdfPath, cancellationToken);
+        }
+        finally
         {
-            var error = await process.StandardError.ReadToEndAsync();
-            throw new InvalidOperationException($"Ghostscript failed with exit code {process.ExitCode}: {error}");
+            try { Directory.Delete(workingDirectory, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    /// <summary>
+    /// Escapes text for use inside a PostScript string literal. Without this, a value such as
+    /// "x) show ... (" breaks out of the string and executes arbitrary PostScript.
+    /// Non-printable / non-ASCII characters are dropped.
+    /// </summary>
+    private static string EscapePostScript(string value)
+    {
+        var sb = new StringBuilder(value.Length);
+        foreach (var c in value)
+        {
+            switch (c)
+            {
+                case '\\': sb.Append("\\\\"); break;
+                case '(': sb.Append("\\("); break;
+                case ')': sb.Append("\\)"); break;
+                default:
+                    if (c >= 0x20 && c < 0x7F)
+                    {
+                        sb.Append(c);
+                    }
+                    break;
+            }
         }
 
-        return await File.ReadAllBytesAsync(pdfPath, cancellationToken);
+        return sb.ToString();
     }
 
     private static string BuildPostScript(MortgageSnapshot snapshot)
@@ -175,7 +228,7 @@ public sealed class MortgagePdfRenderer(
             ResolveApplicationName(snapshot),
             $"Submitted {snapshot.SubmittedAt:MMM d, yyyy h:mm tt 'UTC'}",
             $"Co-applicants: {(snapshot.HasCoApplicants ? "Yes" : "No")}",
-            $"Social Security number: {FormatText(snapshot.SocialSecurityNumber)}",
+            $"Social Security number: {MaskSsn(snapshot.SocialSecurityNumber)}",
             $"Home price range: {FormatRange(snapshot.HomePriceMin, snapshot.HomePriceMax)}"
         };
 
@@ -192,7 +245,7 @@ public sealed class MortgagePdfRenderer(
         var y = 760;
         foreach (var line in contentLines)
         {
-            postScript.Add($"72 {y} moveto ({line}) show");
+            postScript.Add($"72 {y} moveto ({EscapePostScript(line)}) show");
             y -= 18;
         }
 
@@ -226,6 +279,12 @@ public sealed class MortgagePdfRenderer(
         }
 
         return "Not specified";
+    }
+
+    private static string MaskSsn(string? value)
+    {
+        var digits = new string((value ?? string.Empty).Where(char.IsDigit).ToArray());
+        return digits.Length >= 4 ? "***-**-" + digits[^4..] : "Not provided";
     }
 
     private static string FormatText(string? value)

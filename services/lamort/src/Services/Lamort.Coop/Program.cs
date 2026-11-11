@@ -1,15 +1,76 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "lamort-web";
+var jwtKey = builder.Configuration["Jwt:SigningKey"];
+if (string.IsNullOrWhiteSpace(jwtKey) || Encoding.UTF8.GetByteCount(jwtKey) < 32)
+{
+    throw new InvalidOperationException("Jwt:SigningKey must be configured and at least 32 bytes long.");
+}
+
+var tokenValidation = new TokenValidationParameters
+{
+    ValidateIssuer = true,
+    ValidIssuer = jwtIssuer,
+    ValidateAudience = true,
+    ValidAudience = "lamort-coop",
+    ValidateLifetime = true,
+    ValidateIssuerSigningKey = true,
+    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+    ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+    ClockSkew = TimeSpan.FromSeconds(30)
+};
+
+// Returns the authenticated user name from a signed Web-issued token, or null if invalid/expired.
+string? ValidateToken(string? token)
+{
+    if (string.IsNullOrWhiteSpace(token))
+    {
+        return null;
+    }
+
+    try
+    {
+        var principal = new JwtSecurityTokenHandler { MapInboundClaims = false }
+            .ValidateToken(token.Trim(), tokenValidation, out _);
+        var name = principal.FindFirstValue(ClaimTypes.Name) ?? principal.FindFirstValue("unique_name") ?? principal.FindFirstValue("name");
+        return string.IsNullOrWhiteSpace(name) ? null : name;
+    }
+    catch (Exception)
+    {
+        return null;
+    }
+}
 
 var connectionString = builder.Configuration.GetConnectionString("LamortDb")
     ?? throw new InvalidOperationException("Connection string 'LamortDb' is required.");
 
 var app = builder.Build();
 
-app.MapGet("/application", async (Guid? id, CancellationToken cancellationToken) =>
+app.Use(async (context, next) =>
 {
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "no-referrer";
+    context.Response.Headers["Cache-Control"] = "no-store";
+    context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'";
+    await next();
+});
+
+app.MapGet("/application", async (Guid? id, string? token, CancellationToken cancellationToken) =>
+{
+    static string MaskSsn(string ssn)
+    {
+        var digits = new string(ssn.Where(char.IsDigit).ToArray());
+        return digits.Length >= 4 ? "***-**-" + digits[^4..] : "***";
+    }
+
     static string FormatPriceRange(decimal? min, decimal? max)
     {
         if (min is null && max is null)
@@ -28,6 +89,12 @@ app.MapGet("/application", async (Guid? id, CancellationToken cancellationToken)
         }
 
         return $"Up to {max!.Value:0.##}";
+    }
+
+    var authenticatedUser = ValidateToken(token);
+    if (authenticatedUser is null)
+    {
+        return Results.Unauthorized();
     }
 
     if (id is null)
@@ -54,9 +121,12 @@ app.MapGet("/application", async (Guid? id, CancellationToken cancellationToken)
             a.created_at,
             a.submitted_at
         FROM mortgage.applications a
+        LEFT JOIN identity.users owner ON owner."Id" = a.user_id
         WHERE a.id = @id
+            AND (a.co_applicant_user_name = @username OR owner."UserName" = @username)
         """;
     command.Parameters.AddWithValue("@id", id.Value);
+    command.Parameters.AddWithValue("@username", authenticatedUser);
 
     await using var reader = await command.ExecuteReaderAsync(cancellationToken);
     if (!await reader.ReadAsync(cancellationToken))
@@ -68,7 +138,7 @@ app.MapGet("/application", async (Guid? id, CancellationToken cancellationToken)
     var title = reader.IsDBNull(1) ? "Mortgage application" : reader.GetString(1);
     var coApplicantUserName = reader.IsDBNull(2) ? "None" : reader.GetString(2);
     var hasCoApplicants = reader.GetBoolean(3) ? "Yes" : "No";
-    var socialSecurityNumber = reader.IsDBNull(4) ? "Not provided" : reader.GetString(4);
+    var socialSecurityNumber = reader.IsDBNull(4) ? "Not provided" : MaskSsn(reader.GetString(4));
     var documentsRequested = reader.GetBoolean(5) ? "Yes" : "No";
     var homePriceRange = FormatPriceRange(
         reader.IsDBNull(6) ? null : reader.GetDecimal(6),
@@ -138,7 +208,7 @@ app.MapGet("/application", async (Guid? id, CancellationToken cancellationToken)
 
 app.MapGet("/", async (string? token, CancellationToken cancellationToken) =>
 {
-    var safeToken = string.IsNullOrWhiteSpace(token) ? null : System.Text.Encoding.UTF8.GetString(System.Convert.FromBase64String(token.Trim()));
+    var safeToken = ValidateToken(token);
     if (string.IsNullOrWhiteSpace(safeToken))
     {
         return Results.Content(
@@ -195,7 +265,7 @@ app.MapGet("/", async (string? token, CancellationToken cancellationToken) =>
                     <td>{WebUtility.HtmlEncode(application.Status)}</td>
                     <td>{WebUtility.HtmlEncode(application.CreatedAt.ToString("yyyy-MM-dd HH:mm 'UTC'"))}</td>
                     <td>{WebUtility.HtmlEncode(application.SubmittedAt?.ToString("yyyy-MM-dd HH:mm 'UTC'") ?? "Not submitted")}</td>
-                    <td><a href="/coop/application?id={application.Id}">show</a></td>
+                    <td><a href="/coop/application?id={application.Id}&token={Uri.EscapeDataString(token!)}">show</a></td>
                 </tr>
                 """));
 

@@ -13,7 +13,8 @@ namespace Lamort.Web.Pages.App;
 [Authorize]
 public sealed class IndexModel(
     UserManager<LamortUser> userManager,
-    WebDbContext dbContext) : PageModel
+    WebDbContext dbContext,
+    Lamort.Web.Services.JwtTokenService tokenService) : PageModel
 {
     public string FirstName { get; private set; } = "there";
 
@@ -34,7 +35,9 @@ public sealed class IndexModel(
 
         if (!string.IsNullOrWhiteSpace(user.UserName))
         {
-            SharedApplicationsUrl = $"/coop/?token={Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(user.UserName))}";
+            // SECURITY: signed, audience-scoped, 15 minute token (was an unauthenticated base64 username).
+            var coopToken = tokenService.CreateToken(user, Lamort.Shared.Auth.JwtSettings.CoopAudience, lifetimeMinutes: 15);
+            SharedApplicationsUrl = $"/coop/?token={Uri.EscapeDataString(coopToken.AccessToken)}";
         }
 
         var applications = await dbContext.MortgageApplications
@@ -51,8 +54,10 @@ public sealed class IndexModel(
             .ToListAsync())
             .ToHashSet();
 
+        var applicationIds = applications.Select(x => x.Id).ToList();
         var evaluations = await dbContext.MortgageEvaluations
             .AsNoTracking()
+            .Where(x => applicationIds.Contains(x.MortgageApplicationId))
             .ToDictionaryAsync(x => x.MortgageApplicationId);
 
         Applications = applications

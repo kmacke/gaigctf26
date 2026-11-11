@@ -66,7 +66,8 @@ public sealed class SocialSecurityNumberModel(
     public sealed class InputModel
     {
         [Required]
-        [StringLength(128)]
+        [StringLength(11)]
+        [RegularExpression(@"^\d{3}-?\d{2}-?\d{4}$", ErrorMessage = "Enter a valid SSN (NNN-NN-NNNN).")]
         public string SocialSecurityNumber { get; set; } = string.Empty;
     }
 }

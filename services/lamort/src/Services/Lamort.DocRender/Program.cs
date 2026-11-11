@@ -22,6 +22,7 @@ builder.Services.AddDbContext<DocRenderDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("LamortDb")));
 
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>() ?? new JwtSettings();
+jwtSettings.EnsureValid();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -34,21 +35,11 @@ builder.Services
             ValidateIssuerSigningKey = true,
             ValidIssuer = jwtSettings.Issuer,
             ValidAudience = jwtSettings.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SigningKey))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SigningKey)),
+            ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+            ClockSkew = TimeSpan.FromSeconds(30)
         };
-        options.Events = new JwtBearerEvents
-        {
-            OnMessageReceived = context =>
-            {
-                if (context.Request.Query.TryGetValue("access_token", out var accessToken) &&
-                    !string.IsNullOrWhiteSpace(accessToken))
-                {
-                    context.Token = accessToken.ToString();
-                }
-
-                return Task.CompletedTask;
-            }
-        };
+        // SECURITY: tokens are accepted from the Authorization header only, never the URL.
     });
 
 builder.Services.AddAuthorization();
@@ -80,6 +71,8 @@ app.MapGet("/api/mortgages/{id:guid}/pdf", async (
         return Results.NotFound();
     }
 
+    httpContext.Response.Headers["Cache-Control"] = "no-store";
+    httpContext.Response.Headers["X-Content-Type-Options"] = "nosniff";
     httpContext.Response.Headers["Content-Disposition"] = $"inline; filename=\"mortgage-{id:N}.pdf\"";
     return Results.File(
         pdf.PdfBytes,

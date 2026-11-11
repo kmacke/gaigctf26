@@ -12,7 +12,7 @@ services:
       lamort-evaluator:
         condition: service_started
     ports:
-      - "3000:8000"
+      - "127.0.0.1:3000:8000"
     volumes:
       - ./deploy/nginx/lamort.conf:/etc/nginx/nginx.conf:ro
 
@@ -22,9 +22,8 @@ services:
     environment:
       POSTGRES_DB: lamort
       POSTGRES_USER: lamort
-      POSTGRES_PASSWORD: lamort
-    ports:
-      - "5432:5432"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    # Not published to the host: only services on the compose network need the database.
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -34,8 +33,11 @@ services:
       retries: 10
 
   rabbitmq:
-    image: rabbitmq:3-management
+    image: rabbitmq:3
     restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-lamort}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
     healthcheck:
       # "ping" passes before the AMQP listener accepts connections, and the
       # workers crash if they connect in that window.
@@ -54,7 +56,7 @@ services:
         PROJECT_PATH: src/Tools/Lamort.Migrator/Lamort.Migrator.csproj
         APP_DLL: Lamort.Migrator.dll
     environment:
-      ConnectionStrings__LamortDb: Host=postgres;Port=5432;Database=lamort;Username=lamort;Password=lamort
+      ConnectionStrings__LamortDb: Host=postgres;Port=5432;Database=lamort;Username=lamort;Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,14 +70,14 @@ services:
         PROJECT_PATH: src/Services/Lamort.Web/Lamort.Web.csproj
         APP_DLL: Lamort.Web.dll
     environment:
-      ConnectionStrings__LamortDb: Host=postgres;Port=5432;Database=lamort;Username=lamort;Password=lamort
+      ConnectionStrings__LamortDb: Host=postgres;Port=5432;Database=lamort;Username=lamort;Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       Jwt__Issuer: lamort-web
       Jwt__Audience: lamort-internal
-      Jwt__SigningKey: lamort-local-dev-signing-key-please-change
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?set JWT_SIGNING_KEY (>=32 chars) in .env}
       Jwt__ExpirationMinutes: 60
       RabbitMq__HostName: rabbitmq
-      RabbitMq__UserName: guest
-      RabbitMq__Password: guest
+      RabbitMq__UserName: ${RABBITMQ_USER:-lamort}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
       RabbitMq__ExchangeName: lamort.events
       RabbitMq__RoutingKey: mortgage.ready_for_review
     volumes:
@@ -97,7 +99,9 @@ services:
         PROJECT_PATH: src/Services/Lamort.Coop/Lamort.Coop.csproj
         APP_DLL: Lamort.Coop.dll
     environment:
-      ConnectionStrings__LamortDb: Host=postgres;Port=5432;Database=lamort;Username=lamort;Password=lamort
+      Jwt__Issuer: lamort-web
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?set JWT_SIGNING_KEY (>=32 chars) in .env}
+      ConnectionStrings__LamortDb: Host=postgres;Port=5432;Database=lamort;Username=lamort;Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     depends_on:
       postgres:
         condition: service_healthy
@@ -110,14 +114,14 @@ services:
       context: .
       dockerfile: deploy/Dockerfile.docrender
     environment:
-      ConnectionStrings__LamortDb: Host=postgres;Port=5432;Database=lamort;Username=lamort;Password=lamort
+      ConnectionStrings__LamortDb: Host=postgres;Port=5432;Database=lamort;Username=lamort;Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       Jwt__Issuer: lamort-web
       Jwt__Audience: lamort-internal
-      Jwt__SigningKey: lamort-local-dev-signing-key-please-change
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?set JWT_SIGNING_KEY (>=32 chars) in .env}
       Jwt__ExpirationMinutes: 60
       RabbitMq__HostName: rabbitmq
-      RabbitMq__UserName: guest
-      RabbitMq__Password: guest
+      RabbitMq__UserName: ${RABBITMQ_USER:-lamort}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
       RabbitMq__ExchangeName: lamort.events
       RabbitMq__QueueName: lamort.docrender.mortgages
       RabbitMq__RoutingKey: mortgage.ready_for_review
@@ -138,10 +142,10 @@ services:
         PROJECT_PATH: src/Services/Lamort.Evaluator/Lamort.Evaluator.vbproj
         APP_DLL: Lamort.Evaluator.dll
     environment:
-      ConnectionStrings__LamortDb: Host=postgres;Port=5432;Database=lamort;Username=lamort;Password=lamort
+      ConnectionStrings__LamortDb: Host=postgres;Port=5432;Database=lamort;Username=lamort;Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       RabbitMq__HostName: rabbitmq
-      RabbitMq__UserName: guest
-      RabbitMq__Password: guest
+      RabbitMq__UserName: ${RABBITMQ_USER:-lamort}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
       RabbitMq__ExchangeName: lamort.events
       RabbitMq__QueueName: lamort.evaluator.mortgages
       RabbitMq__RoutingKey: mortgage.ready_for_review

@@ -41,6 +41,12 @@ document.addEventListener("click", function (event) {
       return;
     }
 
+    // Open the tab synchronously (popup blockers), then point it at a blob once fetched.
+    var pdfWindow = window.open("", "_blank");
+    if (pdfWindow) {
+      pdfWindow.opener = null;
+    }
+
     fetch("/auth/token", { credentials: "same-origin" })
       .then(function (response) {
         if (!response.ok) {
@@ -55,9 +61,30 @@ document.addEventListener("click", function (event) {
           throw new Error("Missing token.");
         }
 
-        window.open("/docrender/api/mortgages/" + mortgageId + "/pdf?access_token=" + encodeURIComponent(accessToken), "_blank", "noopener");
+        // SECURITY: token goes in the Authorization header, never in the URL.
+        return fetch("/docrender/api/mortgages/" + encodeURIComponent(mortgageId) + "/pdf", {
+          headers: { Authorization: "Bearer " + accessToken }
+        });
+      })
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error("Unable to load PDF.");
+        }
+
+        return response.blob();
+      })
+      .then(function (blob) {
+        var url = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
+        if (pdfWindow) {
+          pdfWindow.location.href = url;
+        } else {
+          window.location.href = url;
+        }
       })
       .catch(function () {
+        if (pdfWindow) {
+          pdfWindow.close();
+        }
         window.location.href = "/App";
       });
   }
