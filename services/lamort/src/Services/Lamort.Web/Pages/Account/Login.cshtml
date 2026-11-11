@@ -1,0 +1,16 @@
+@page
+@model Lamort.Web.Pages.Account.LoginModel
+@{
+    ViewData["Title"] = "Login";
+}
+
+<main class="shell">
+    <h1>Login</h1>
+    <form method="post" class="stack" novalidate>
+        <div asp-validation-summary="ModelOnly" class="validation"></div>
+        <input type="hidden" asp-for="ReturnUrl" />
+        <label>Email or username <input asp-for="Input.Credential" /></label>
+        <label>Password <input asp-for="Input.Password" /></label>
+        <button type="submit" formnovalidate>Login</button>
+    </form>
+</main>

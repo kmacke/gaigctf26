@@ -1,0 +1,28 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "lamort";
+}
+
+<main class="shell">
+    <section class="landing-hero">
+        <div class="landing-copy">
+            <p class="eyebrow">Welcome</p>
+            <h2>The last home lending solution you'll ever need.</h2>
+            <p class="landing-lead">We keep you on the fast track to finding your forever home.</p>
+            <div class="landing-actions">
+                <a asp-page="/Account/Register" class="button-link">Create your account</a>
+                <a asp-page="/Account/Login" class="button-link secondary">Sign in</a>
+            </div>
+        </div>
+        <aside class="landing-panel">
+            <span class="pill">Quick approval</span>
+            <h2>What you can do</h2>
+            <ul class="landing-list">
+                <li>Start and resume a mortgage application at any time.</li>
+                <li>Track assets, income, debts, and target home price range.</li>
+                <li>Review your application status from a single dashboard.</li>
+            </ul>
+        </aside>
+    </section>
+</main>

@@ -1,0 +1,25 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS dev
+ARG PROJECT_PATH
+ARG APP_DLL
+
+WORKDIR /src
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends perl \
+    && rm -rf /var/lib/apt/lists/*
+COPY . .
+RUN dotnet restore "$PROJECT_PATH"
+
+FROM dev AS build
+RUN dotnet publish "$PROJECT_PATH" -c Release -o /app/publish /p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+ARG APP_DLL
+
+WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends perl \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=build /app/publish .
+
+ENV APP_DLL=${APP_DLL}
+ENTRYPOINT ["sh", "-c", "dotnet ${APP_DLL}"]

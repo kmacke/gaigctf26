@@ -1,0 +1,68 @@
+@page "{id:guid}"
+@model Lamort.Web.Pages.App.Mortgages.DebtsModel
+@{
+    ViewData["Title"] = "Existing debts";
+}
+
+<main class="shell shell-wide">
+    <section class="wizard-hero">
+        <div>
+            <p class="eyebrow">Mortgage application</p>
+            <h1>Existing debts</h1>
+            <p>Share current liabilities so the review team has a complete view of your obligations.</p>
+        </div>
+        <div class="wizard-step">Step 4 of 5</div>
+    </section>
+
+    <section class="wizard-card">
+        <form method="post" class="stack gap-lg" novalidate>
+            <div asp-validation-summary="ModelOnly" class="validation"></div>
+
+            <section class="entry-section">
+                <div class="section-heading">
+                    <div>
+                        <h2>Debt obligations</h2>
+                        <p>Include credit lines, installment loans, and any other outstanding balances you want reviewed.</p>
+                    </div>
+                    <button type="button" class="secondary" data-add-row="debt-template" data-target="debt-rows">Add debt</button>
+                </div>
+
+                <div id="debt-rows" class="entry-list">
+                    @for (var i = 0; i < Model.Input.Debts.Count; i++)
+                    {
+                        <div class="entry-row">
+                            <label>
+                                Debt name
+                                <input asp-for="Input.Debts[i].Name" />
+                            </label>
+                            <label>
+                                Amount
+                                <input asp-for="Input.Debts[i].Amount" type="number" oninput="this.value = this.value.replace(/[^0-9.$]/g, '')" min="0" step="0.01" />
+                            </label>
+                            <button type="button" class="icon-button" data-remove-row>Remove</button>
+                        </div>
+                    }
+                </div>
+            </section>
+
+            <div class="wizard-actions">
+                <a asp-page="/App/Mortgages/AssetsIncome" asp-route-id="@Model.Id" class="button-link secondary">Back</a>
+                <button type="submit">Continue</button>
+            </div>
+        </form>
+    </section>
+</main>
+
+<template id="debt-template">
+    <div class="entry-row">
+        <label>
+            Debt name
+            <input name="Input.Debts[__index__].Name" />
+        </label>
+        <label>
+            Amount
+            <input name="Input.Debts[__index__].Amount" oninput="this.value = this.value.replace(/[^0-9.$]/g, '')" type="number" min="0" step="0.01" />
+        </label>
+        <button type="button" class="icon-button" data-remove-row>Remove</button>
+    </div>
+</template>

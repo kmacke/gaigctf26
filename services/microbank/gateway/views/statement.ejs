@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>MicroBank Statement</title>
+  <style>
+    body { font-family: 'Courier New', monospace; margin: 20px; background: #f5f5f5; }
+    .header { background: #2c3e50; color: white; padding: 20px; border-radius: 5px; }
+    .balance { font-size: 24px; color: #27ae60; margin: 20px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #34495e; color: white; }
+    tr:nth-child(even) { background: #f2f2f2; }
+    .account-info { margin: 10px 0; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>MicroBank Account Statement</h1>
+    <p>Account Holder: NICKNAME_PLACEHOLDER</p>
+  </div>
+
+  <div class="account-info">
+    <p>Account ID: <%= account_id %></p>
+  </div>
+
+  <div class="balance">
+    Balance: $<%= balance.toLocaleString() %>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Type</th>
+        <th>Amount</th>
+        <th>Reference</th>
+        <th>Memo</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (transactions && transactions.length > 0) { %>
+        <% transactions.forEach(function(txn) { %>
+          <tr>
+            <td><%= new Date(parseInt(txn.timestamp)).toLocaleString() %></td>
+            <td><%= txn.type %></td>
+            <td>$<%= parseFloat(txn.amount).toLocaleString() %></td>
+            <td><%= txn.reference || '-' %></td>
+            <td><%= txn.memo || '-' %></td>
+          </tr>
+        <% }); %>
+      <% } else { %>
+        <tr><td colspan="5">No transactions found.</td></tr>
+      <% } %>
+    </tbody>
+  </table>
+</body>
+</html>

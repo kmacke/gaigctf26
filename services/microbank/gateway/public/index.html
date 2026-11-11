@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MicroBank</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav id="navbar">
+    <div class="nav-brand">
+      <span class="logo">◈</span> MicroBank
+    </div>
+    <div class="nav-links" id="nav-links">
+      <a href="#" onclick="showView('dashboard')">Dashboard</a>
+      <a href="#" onclick="showView('transfer')">Transfer</a>
+      <a href="#" onclick="showView('batch')">Batch</a>
+      <a href="#" onclick="showView('history')">History</a>
+      <a href="#" onclick="showView('settings')">Settings</a>
+      <a href="#" onclick="logout()" class="btn-logout">Logout</a>
+    </div>
+  </nav>
+
+  <main id="app">
+
+    <div id="view-auth" class="view active">
+      <div class="auth-container">
+        <div class="auth-header">
+          <span class="logo-large">◈</span>
+          <h1>MicroBank</h1>
+          <p class="tagline">Secure Digital Banking</p>
+        </div>
+        <div class="auth-tabs">
+          <button class="tab active" onclick="switchTab('login')">Login</button>
+          <button class="tab" onclick="switchTab('register')">Register</button>
+        </div>
+        <form id="form-login" class="auth-form" onsubmit="return handleLogin(event)">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="login-user" required autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="login-pass" required autocomplete="current-password">
+          </div>
+          <button type="submit" class="btn-primary">Sign In</button>
+        </form>
+        <form id="form-register" class="auth-form hidden" onsubmit="return handleRegister(event)">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="reg-user" required autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="reg-pass" required autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label>Nickname</label>
+            <input type="text" id="reg-nick" placeholder="Display name">
+          </div>
+          <button type="submit" class="btn-primary">Create Account</button>
+        </form>
+        <div id="auth-error" class="error-msg hidden"></div>
+      </div>
+    </div>
+
+    <div id="view-dashboard" class="view">
+      <div class="dashboard-grid">
+        <div class="card balance-card">
+          <div class="card-label">Available Balance</div>
+          <div class="card-value" id="balance-display">$0</div>
+          <div class="card-sub" id="account-id-display"></div>
+        </div>
+        <div class="card">
+          <div class="card-label">Quick Deposit</div>
+          <form onsubmit="return quickDeposit(event)">
+            <div class="inline-form">
+              <input type="number" id="dep-amount" placeholder="Amount" min="1" required>
+              <input type="text" id="dep-memo" placeholder="Memo (optional)">
+              <button type="submit" class="btn-success">Deposit</button>
+            </div>
+          </form>
+        </div>
+        <div class="card">
+          <div class="card-label">Quick Withdraw</div>
+          <form onsubmit="return quickWithdraw(event)">
+            <div class="inline-form">
+              <input type="number" id="wd-amount" placeholder="Amount" min="1" required>
+              <input type="text" id="wd-memo" placeholder="Memo (optional)">
+              <button type="submit" class="btn-danger">Withdraw</button>
+            </div>
+          </form>
+        </div>
+        <div class="card wide">
+          <div class="card-label">Recent Transactions</div>
+          <table id="recent-txns">
+            <thead>
+              <tr><th>Type</th><th>Amount</th><th>Reference</th><th>Time</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-transfer" class="view">
+      <div class="card form-card">
+        <h2>Send Transfer</h2>
+        <form onsubmit="return handleTransfer(event)">
+          <div class="form-group">
+            <label>Recipient Account ID</label>
+            <input type="text" id="xfer-to" required placeholder="UUID of recipient">
+          </div>
+          <div class="form-group">
+            <label>Amount</label>
+            <input type="number" id="xfer-amount" min="1" required>
+          </div>
+          <div class="form-group">
+            <label>Reference</label>
+            <input type="text" id="xfer-ref" placeholder="Optional reference">
+          </div>
+          <div class="form-group">
+            <label>Memo</label>
+            <input type="text" id="xfer-memo" placeholder="Optional memo">
+          </div>
+          <button type="submit" class="btn-primary">Send</button>
+        </form>
+        <div id="xfer-result" class="result-msg hidden"></div>
+      </div>
+    </div>
+
+    <div id="view-batch" class="view">
+      <div class="card form-card">
+        <h2>Batch Transfer</h2>
+        <div id="batch-rows">
+          <div class="batch-row">
+            <input type="text" placeholder="Recipient Account ID" class="batch-to">
+            <input type="number" placeholder="Amount" class="batch-amt" min="1">
+            <input type="text" placeholder="Memo" class="batch-memo">
+          </div>
+        </div>
+        <div class="batch-actions">
+          <button class="btn-secondary" onclick="addBatchRow()">+ Add Row</button>
+          <button class="btn-primary" onclick="submitBatch()">Send All</button>
+        </div>
+        <div id="batch-result" class="result-msg hidden"></div>
+      </div>
+    </div>
+
+    <div id="view-history" class="view">
+      <div class="card wide">
+        <div class="history-header">
+          <h2>Transaction History</h2>
+          <button class="btn-secondary" onclick="loadHistory()">Refresh</button>
+          <a href="/api/statement" target="_blank" class="btn-secondary">View Statement</a>
+        </div>
+        <table id="history-table">
+          <thead>
+            <tr><th>ID</th><th>Type</th><th>Amount</th><th>To/From</th><th>Reference</th><th>Memo</th><th>Time</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="view-settings" class="view">
+      <div class="card form-card">
+        <h2>Account Settings</h2>
+        <div class="form-group">
+          <label>Account ID</label>
+          <input type="text" id="set-account-id" readonly>
+        </div>
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="set-username" readonly>
+        </div>
+        <form onsubmit="return updateNickname(event)">
+          <div class="form-group">
+            <label>Nickname</label>
+            <input type="text" id="set-nickname" required>
+          </div>
+          <button type="submit" class="btn-primary">Update Nickname</button>
+        </form>
+        <div id="settings-result" class="result-msg hidden"></div>
+        <hr>
+        <h3>Service Fee</h3>
+        <form onsubmit="return handleFee(event)">
+          <div class="inline-form">
+            <input type="number" id="fee-amount" placeholder="Amount" value="1" min="1">
+            <input type="text" id="fee-desc" placeholder="Description">
+            <button type="submit" class="btn-secondary">Charge Fee</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

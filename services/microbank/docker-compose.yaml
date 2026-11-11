@@ -1,0 +1,38 @@
+services:
+  ledger:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+
+  engine:
+    platform: linux/amd64
+    build:
+      context: ./engine
+      dockerfile: Dockerfile
+    depends_on:
+      - ledger
+    environment:
+      - REDIS_URL=redis://ledger:6379
+    restart: unless-stopped
+
+  gateway:
+    platform: linux/amd64
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    ports:
+      - "2000:3000"
+    depends_on:
+      - ledger
+      - engine
+    environment:
+      - REDIS_URL=redis://ledger:6379
+      - ENGINE_URL=http://engine:8080
+      - SESSION_SECRET=microbank-s3cret-k3y-2026
+      - PORT=3000
+    restart: unless-stopped
+
+volumes:
+  redis-data:

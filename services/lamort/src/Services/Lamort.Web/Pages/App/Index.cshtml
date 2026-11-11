@@ -1,0 +1,94 @@
+@page
+@model Lamort.Web.Pages.App.IndexModel
+@{
+    ViewData["Title"] = "App";
+}
+
+<main class="shell">
+    <section class="app-hero">
+        <div>
+            <p class="eyebrow">The mortician is in!</p>
+            <h1>Welcome back, @Model.FirstName.</h1>
+            <p>Track your mortgage applications, review financial details, and continue any in-progress file.</p>
+        </div>
+    </section>
+
+    <section class="applications-panel">
+        <div class="applications-header">
+            <h2>Mortgage applications</h2>
+            <a asp-page="/App/Mortgages/New" class="button-link secondary">Start new application</a>
+        </div>
+
+        @if (Model.Applications.Count == 0)
+        {
+            <p class="empty-state">No mortgage applications yet. Start a new application to begin your approval review.</p>
+        }
+        else
+        {
+            <div class="application-list">
+                @foreach (var application in Model.Applications)
+                {
+                    <article class="application-card">
+                        <div class="application-card-header">
+                            <div>
+                                <p class="eyebrow">Application opened @application.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")</p>
+                                <h3>@application.ApplicationName</h3>
+                                <p>@application.Status</p>
+                                @if (!string.IsNullOrWhiteSpace(application.EvaluationReason))
+                                {
+                                    <p>@application.EvaluationReason</p>
+                                }
+                            </div>
+                            <div class="application-card-actions">
+                                @if (application.IsSubmitted)
+                                {
+                                    if (application.HasRenderedPdf)
+                                    {
+                                        <button type="button" class="button-link secondary" data-open-pdf="@application.Id">Open PDF</button>
+                                    }
+                                    else
+                                    {
+                                        <span class="button-link button-link-muted">Preparing PDF</span>
+                                    }
+
+                                    <a asp-page="/App/Mortgages/Review" asp-route-id="@application.Id" class="button-link secondary">View details</a>
+                                }
+                                else
+                                {
+                                    <a asp-page="/App/Mortgages/CoApplicants" asp-route-id="@application.Id" class="button-link secondary">Continue</a>
+                                }
+                            </div>
+                        </div>
+
+                        <dl class="application-metrics">
+                            <div>
+                                <dt>Co-applicants</dt>
+                                <dd>@application.CoApplicants</dd>
+                            </div>
+                            <div>
+                                <dt>Asset entries</dt>
+                                <dd>@application.AssetEntries</dd>
+                            </div>
+                            <div>
+                                <dt>Income entries</dt>
+                                <dd>@application.IncomeEntries</dd>
+                            </div>
+                            <div>
+                                <dt>Total debts</dt>
+                                <dd>@application.TotalDebts</dd>
+                            </div>
+                            <div>
+                                <dt>Home price range</dt>
+                                <dd>@application.HomePriceRange</dd>
+                            </div>
+                        </dl>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="applications-panel">
+        <a href="@Model.SharedApplicationsUrl" class="button-link secondary">View applications shared with you</a>
+    </section>
+</main>

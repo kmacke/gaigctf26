@@ -1,0 +1,51 @@
+Welcome! 💻 This is the virtual machine that hosts your vulnerable service.
+
+[1;4mDEFENDING[0m
+
+You can find the code for the vuln services at [34m~/ad/services/[0m
+
+Since the services are running in Docker containers, the host machine
+is out of scope.
+
+For some of the services, they'll automatically restart if their code
+is edited, you might not need to rebuild the container or anything.
+
+Some docker compose tips:
+   [33mdocker compose up -d[0m to turn on the service. If you've
+        made changes and rebuilt the container image, this should
+        recreate a fresh new container with your changes included.
+   [33mdocker compose logs -f[0m to tail the logs.
+   [33mdocker compose build[0m to rebuild the container image.
+   [33mdocker compose down[0m to turn off the service.
+   [33mdocker compose down -v[0m to turn off the service and remove
+        the database storage volume. Your database will be respawned
+        from scratch on next start. CAREFUL!
+
+A backup ZIP file is provided in case you really break your service.
+
+[1;4mATTACKING[0m
+
+We've provided some example scripts in the [34m~/ad/scripts[0m folder.
+The INI file there has been preloaded with your team number and secret
+token. Your token is there so that you can authenticate against the
+scoreboard API, where you can query for live flags and submit the flags
+you manage to steal.
+
+Under NO CIRCUMSTANCES should you expose your secret token when attacking.
+Do not let your secret token go anywhere near other teams' machines.
+It is against the rules to abuse another team's token, but people might do
+it anyways, so don't give them the chance to.
+
+The two [34mexample_[0m python scripts in there won't be very useful on
+their own, but you can use them as building blocks for creating your own
+attacker script. Note that you don't have to use Python, you can use whatever
+language you want. Also, you can attack from your personal machine, it doesn't
+have to be from this VM.
+
+[34m~/ad/scripts/runs_every_2_minutes.py[0m is, as the name implies, run
+every 2 minutes by a cron job. By default it doesn't do anything, but feel
+free to put your own attack code here. You should be scripting/automating
+your attacks like this for maximal efficiency. It logs to the file at
+[34m/var/log/periodic_script[0m when it runs.
+
+Good luck!

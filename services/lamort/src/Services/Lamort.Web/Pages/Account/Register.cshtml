@@ -1,0 +1,17 @@
+@page
+@model Lamort.Web.Pages.Account.RegisterModel
+@{
+    ViewData["Title"] = "Register";
+}
+
+<main class="shell">
+    <h1>Register</h1>
+    <form method="post" class="stack" novalidate>
+        <div asp-validation-summary="ModelOnly" class="validation"></div>
+        <input type="hidden" asp-for="ReturnUrl" />
+        <label>Full name <input type="text" name="Input.FullName" value="@Model.Input.FullName" /></label>
+        <label>Email <input type="text" name="Input.Email" value="@Model.Input.Email" /></label>
+        <label>Password <input type="password" name="Input.Password" value="@Model.Input.Password" /></label>
+        <button type="submit" formnovalidate>Create account</button>
+    </form>
+</main>

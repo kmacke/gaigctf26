@@ -1,0 +1,32 @@
+@page "{id:guid}"
+@model Lamort.Web.Pages.App.Mortgages.SocialSecurityNumberModel
+@{
+    ViewData["Title"] = "Social Security number";
+}
+
+<main class="shell shell-wide">
+    <section class="wizard-hero">
+        <div>
+            <p class="eyebrow">Mortgage application</p>
+            <h1>Social Security number</h1>
+            <p>Enter the Social Security number you want included with this mortgage file.</p>
+        </div>
+        <div class="wizard-step">Step 2 of 5</div>
+    </section>
+
+    <section class="wizard-card">
+        <form method="post" class="stack gap-lg" novalidate>
+            <div asp-validation-summary="ModelOnly" class="validation"></div>
+
+            <label>
+                Social Security number
+                <input asp-for="Input.SocialSecurityNumber" type="text" maxlength="128" />
+            </label>
+
+            <div class="wizard-actions">
+                <a asp-page="/App/Mortgages/CoApplicants" asp-route-id="@Model.Id" class="button-link secondary">Back</a>
+                <button type="submit">Continue</button>
+            </div>
+        </form>
+    </section>
+</main>

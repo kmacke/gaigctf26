@@ -1,0 +1,54 @@
+@page "{id:guid}"
+@model Lamort.Web.Pages.App.Mortgages.CoApplicantsModel
+@{
+    ViewData["Title"] = "Mortgage application";
+}
+
+<main class="shell shell-wide">
+    <section class="wizard-hero">
+        <div>
+            <p class="eyebrow">Mortgage application</p>
+            <h1>Tell us about this application</h1>
+            <p>We will use these details to prepare your file for a quick approval review.</p>
+        </div>
+        <div class="wizard-step">Step 1 of 5</div>
+    </section>
+
+    <section class="wizard-card">
+        <form method="post" class="stack gap-lg" novalidate>
+            <div asp-validation-summary="ModelOnly" class="validation"></div>
+
+            <label>
+                Application name
+                <input asp-for="Input.ApplicationName" maxlength="200" />
+            </label>
+
+            <div class="option-grid">
+                <label class="option-card">
+                    <input type="radio" name="Input.HasCoApplicants" value="true" @(Model.Input.HasCoApplicants ? "checked" : null) />
+                    <span>
+                        <strong>Yes, I will apply with a co-applicant</strong>
+                        <small>They will be able to view your application.</small>
+                    </span>
+                </label>
+                <label class="option-card">
+                    <input type="radio" name="Input.HasCoApplicants" value="false" @(!Model.Input.HasCoApplicants ? "checked" : null) />
+                    <span>
+                        <strong>No, this is a single-applicant mortgage</strong>
+                        <small>You can continue with your own assets, income, and liabilities.</small>
+                    </span>
+                </label>
+            </div>
+
+            <label>
+                Co-applicant username
+                <input asp-for="Input.CoApplicantUserName" maxlength="256" />
+            </label>
+
+            <div class="wizard-actions">
+                <a asp-page="/App/Index" class="button-link secondary">Back to applications</a>
+                <button type="submit">Continue</button>
+            </div>
+        </form>
+    </section>
+</main>

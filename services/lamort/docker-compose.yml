@@ -1,0 +1,158 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      lamort-web:
+        condition: service_started
+      lamort-coop:
+        condition: service_started
+      lamort-docrender:
+        condition: service_started
+      lamort-evaluator:
+        condition: service_started
+    ports:
+      - "3000:8000"
+    volumes:
+      - ./deploy/nginx/lamort.conf:/etc/nginx/nginx.conf:ro
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: lamort
+      POSTGRES_USER: lamort
+      POSTGRES_PASSWORD: lamort
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lamort -d lamort"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    restart: unless-stopped
+    healthcheck:
+      # "ping" passes before the AMQP listener accepts connections, and the
+      # workers crash if they connect in that window.
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 10s
+      # Each probe boots an Erlang VM, which is slow on a small box.
+      timeout: 15s
+      start_period: 20s
+      retries: 10
+
+  lamort-migrator:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.service
+      args:
+        PROJECT_PATH: src/Tools/Lamort.Migrator/Lamort.Migrator.csproj
+        APP_DLL: Lamort.Migrator.dll
+    environment:
+      ConnectionStrings__LamortDb: Host=postgres;Port=5432;Database=lamort;Username=lamort;Password=lamort
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  lamort-web:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.service
+      args:
+        PROJECT_PATH: src/Services/Lamort.Web/Lamort.Web.csproj
+        APP_DLL: Lamort.Web.dll
+    environment:
+      ConnectionStrings__LamortDb: Host=postgres;Port=5432;Database=lamort;Username=lamort;Password=lamort
+      Jwt__Issuer: lamort-web
+      Jwt__Audience: lamort-internal
+      Jwt__SigningKey: lamort-local-dev-signing-key-please-change
+      Jwt__ExpirationMinutes: 60
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__UserName: guest
+      RabbitMq__Password: guest
+      RabbitMq__ExchangeName: lamort.events
+      RabbitMq__RoutingKey: mortgage.ready_for_review
+    volumes:
+      - web-data-protection:/root/.aspnet/DataProtection-Keys
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      lamort-migrator:
+        condition: service_completed_successfully
+
+  lamort-coop:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.service
+      args:
+        PROJECT_PATH: src/Services/Lamort.Coop/Lamort.Coop.csproj
+        APP_DLL: Lamort.Coop.dll
+    environment:
+      ConnectionStrings__LamortDb: Host=postgres;Port=5432;Database=lamort;Username=lamort;Password=lamort
+    depends_on:
+      postgres:
+        condition: service_healthy
+      lamort-migrator:
+        condition: service_completed_successfully
+
+  lamort-docrender:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.docrender
+    environment:
+      ConnectionStrings__LamortDb: Host=postgres;Port=5432;Database=lamort;Username=lamort;Password=lamort
+      Jwt__Issuer: lamort-web
+      Jwt__Audience: lamort-internal
+      Jwt__SigningKey: lamort-local-dev-signing-key-please-change
+      Jwt__ExpirationMinutes: 60
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__UserName: guest
+      RabbitMq__Password: guest
+      RabbitMq__ExchangeName: lamort.events
+      RabbitMq__QueueName: lamort.docrender.mortgages
+      RabbitMq__RoutingKey: mortgage.ready_for_review
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      lamort-migrator:
+        condition: service_completed_successfully
+
+  lamort-evaluator:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.evaluator
+      args:
+        PROJECT_PATH: src/Services/Lamort.Evaluator/Lamort.Evaluator.vbproj
+        APP_DLL: Lamort.Evaluator.dll
+    environment:
+      ConnectionStrings__LamortDb: Host=postgres;Port=5432;Database=lamort;Username=lamort;Password=lamort
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__UserName: guest
+      RabbitMq__Password: guest
+      RabbitMq__ExchangeName: lamort.events
+      RabbitMq__QueueName: lamort.evaluator.mortgages
+      RabbitMq__RoutingKey: mortgage.ready_for_review
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      lamort-migrator:
+        condition: service_completed_successfully
+
+volumes:
+  postgres-data:
+  web-data-protection:

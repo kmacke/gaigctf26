@@ -1,0 +1,125 @@
+@page "{id:guid}"
+@model Lamort.Web.Pages.App.Mortgages.AssetsIncomeModel
+@{
+    ViewData["Title"] = "Assets and income";
+}
+
+<main class="shell shell-wide">
+    <section class="wizard-hero">
+        <div>
+            <p class="eyebrow">Mortgage application</p>
+            <h1>Assets and income</h1>
+            <p>List the balances and income sources you want considered with this application.</p>
+        </div>
+        <div class="wizard-step">Step 3 of 5</div>
+    </section>
+
+    <section class="wizard-card">
+        <form method="post" class="stack gap-xl" novalidate>
+            <div asp-validation-summary="ModelOnly" class="validation"></div>
+
+            <section class="entry-section">
+                <div class="section-heading">
+                    <div>
+                        <h2>Assets</h2>
+                        <p>Include accounts, investments, or other liquid assets available to support this mortgage.</p>
+                    </div>
+                    <button type="button" class="secondary" data-add-row="assets-template" data-target="assets-rows">Add asset</button>
+                </div>
+
+                <div id="assets-rows" class="entry-list">
+                    @for (var i = 0; i < Model.Input.Assets.Count; i++)
+                    {
+                        <div class="entry-row">
+                            <label>
+                                Asset name
+                                <input asp-for="Input.Assets[i].Name" />
+                            </label>
+                            <label>
+                                Amount
+                                <input asp-for="Input.Assets[i].Amount" type="number" oninput="this.value = this.value.replace(/[^0-9.$]/g, '')" />
+                            </label>
+                            <button type="button" class="icon-button" data-remove-row>Remove</button>
+                        </div>
+                    }
+                </div>
+            </section>
+
+            <section class="entry-section">
+                <div class="section-heading">
+                    <div>
+                        <h2>Income sources</h2>
+                        <p>Add each recurring income source you would like included in the review.</p>
+                    </div>
+                    <button type="button" class="secondary" data-add-row="income-template" data-target="income-rows">Add income</button>
+                </div>
+
+                <div id="income-rows" class="entry-list">
+                    @for (var i = 0; i < Model.Input.Incomes.Count; i++)
+                    {
+                        <div class="entry-row entry-row-income">
+                            <label>
+                                Income source
+                                <input asp-for="Input.Incomes[i].Name" />
+                            </label>
+                            <label>
+                                Type
+                                <input asp-for="Input.Incomes[i].IncomeType" />
+                            </label>
+                            <label>
+                                Amount
+                                <input asp-for="Input.Incomes[i].Amount" type="number" oninput="this.value = this.value.replace(/[^0-9.$]/g, '')" />
+                            </label>
+                            <button type="button" class="icon-button" data-remove-row>Remove</button>
+                        </div>
+                    }
+                </div>
+            </section>
+
+            <section class="callout upload-placeholder">
+                <div>
+                    <h2>Supporting documents</h2>
+                    <p>Upload options will appear here for statements, pay stubs, and related mortgage documentation.</p>
+                </div>
+                <span class="pill">Coming soon</span>
+            </section>
+
+            <div class="wizard-actions">
+                <a asp-page="/App/Mortgages/SocialSecurityNumber" asp-route-id="@Model.Id" class="button-link secondary">Back</a>
+                <button type="submit">Continue</button>
+            </div>
+        </form>
+    </section>
+</main>
+
+<template id="assets-template">
+    <div class="entry-row">
+        <label>
+            Asset name
+            <input name="Input.Assets[__index__].Name" />
+        </label>
+        <label>
+            Amount
+            <input name="Input.Assets[__index__].Amount" type="text" inputmode="decimal" />
+        </label>
+        <button type="button" class="icon-button" data-remove-row>Remove</button>
+    </div>
+</template>
+
+<template id="income-template">
+    <div class="entry-row entry-row-income">
+        <label>
+            Income source
+            <input name="Input.Incomes[__index__].Name" />
+        </label>
+        <label>
+            Type
+            <input name="Input.Incomes[__index__].IncomeType" />
+        </label>
+        <label>
+            Amount
+            <input name="Input.Incomes[__index__].Amount" type="text" inputmode="decimal" />
+        </label>
+        <button type="button" class="icon-button" data-remove-row>Remove</button>
+    </div>
+</template>

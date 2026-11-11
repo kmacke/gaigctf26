@@ -1,0 +1,77 @@
+@page "{id:guid}"
+@model Lamort.Web.Pages.App.Mortgages.ReviewModel
+@{
+    ViewData["Title"] = "Application review";
+}
+
+<main class="shell shell-wide">
+    <section class="wizard-hero">
+        <div>
+            <p class="eyebrow">Mortgage application</p>
+            <h2>@Model.ApplicationName</h2>
+            <h1>@Model.HeroTitle</h1>
+            <p>@Model.HeroMessage</p>
+        </div>
+        <div class="wizard-step status-pill @Model.HeroStatusClass">@Model.HeroStatus</div>
+    </section>
+
+    <section class="wizard-card">
+        <div class="summary-grid">
+            <article class="summary-card">
+                <span>Co-applicants</span>
+                <strong>@Model.Summary.CoApplicants</strong>
+            </article>
+            <article class="summary-card">
+                <span>Social Security number</span>
+                <strong>@Model.Summary.SocialSecurityNumber</strong>
+            </article>
+            <article class="summary-card">
+                <span>Asset entries</span>
+                <strong>@Model.Summary.AssetEntries</strong>
+            </article>
+            <article class="summary-card">
+                <span>Income entries</span>
+                <strong>@Model.Summary.IncomeEntries</strong>
+            </article>
+            <article class="summary-card">
+                <span>Total debts</span>
+                <strong>@Model.Summary.TotalDebts</strong>
+            </article>
+            <article class="summary-card">
+                <span>Home price range</span>
+                <strong>@Model.Summary.HomePriceRange</strong>
+            </article>
+        </div>
+
+        @if (Model.ApplicationSubmitted)
+        {
+            <article class="summary-card" style="margin-top: 1.5rem;">
+                <span>Evaluation</span>
+                @if (Model.Evaluation is null)
+                {
+                    <strong>Pending</strong>
+                    <p>The evaluator has not finished processing this application yet.</p>
+                }
+                else
+                {
+                    <strong>@(Model.Evaluation.Approved ? "Approved" : "Denied")</strong>
+                    <p>@Model.Evaluation.Reason</p>
+                }
+            </article><br /><br />
+        }
+
+        <div class="wizard-actions">
+            @if (Model.ApplicationSubmitted)
+            {
+                <a asp-page="/App/Index" class="button-link">Return to applications</a>
+            }
+            else
+            {
+                <a asp-page="/App/Mortgages/HomePrice" asp-route-id="@Model.Id" class="button-link secondary">Back</a>
+                <form method="post">
+                    <button type="submit">Submit for review</button>
+                </form>
+            }
+        </div>
+    </section>
+</main>

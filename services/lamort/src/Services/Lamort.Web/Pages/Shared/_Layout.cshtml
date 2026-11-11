@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - lamort</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/Lamort.Web.styles.css" asp-append-version="true" />
+</head>
+<body>
+    @{
+        var currentUser = User.Identity?.Name ?? User.FindFirst("email")?.Value ?? "Signed in";
+    }
+    <header class="nav">
+        <a asp-page="/Index" class="site-logo" aria-label="Lamort home">
+            <img src="~/img/logo.png" alt="Lamort" />
+        </a>
+        <nav>
+            <a asp-page="/Index">Home</a>
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <a asp-page="/App/Index">App</a>
+                <span class="current-user">@currentUser</span>
+                <form method="post" asp-page="/Account/Logout" class="inline">
+                    <button type="submit">Logout</button>
+                </form>
+            }
+            else
+            {
+                <a asp-page="/Account/Login">Login</a>
+                <a asp-page="/Account/Register">Register</a>
+            }
+        </nav>
+    </header>
+    @RenderBody()
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@4.0.0/dist/jquery.min.js" integrity="sha256-OaVG6prZf4v69dPg6PhVattBXkcOWQB62pdZ3ORyrao=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery-validation@1.22.1/dist/jquery.validate.min.js" integrity="sha256-1IuP7k/g+d98/r5+D1I2X2w+xhBVJJ+shT7D1kXXiYs=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery-validation-unobtrusive@4.0.0/dist/jquery.validate.unobtrusive.min.js" integrity="sha256-RFWFWIIPsjB4DucR4jqwxTWw13ZmtI+s6tVR2LJmZXk=" crossorigin="anonymous"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
